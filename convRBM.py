@@ -16,6 +16,7 @@ from sklearn.utils import issparse
 from sklearn.utils.extmath import safe_sparse_dot
 from sklearn.utils.extmath import logistic_sigmoid
 from conv import conv
+from conv import convExpend
 import amitgroup.plot as gr
 
 
@@ -192,8 +193,6 @@ class convRBM(BaseEstimator, TransformerMixin):
         return np.array([conv(visibleData[i,:,:],mean_h[i]) for i in range(v.shape[0])])
 
 
-
-
     def _sample_hiddens(self, v, k, rng):
         """Sample from the distribution P(h|v).
 
@@ -213,6 +212,8 @@ class convRBM(BaseEstimator, TransformerMixin):
         p = self._mean_hiddens(v,k)
         p[rng.uniform(size=p.shape) < p] = 1.
         return np.floor(p, p)
+   
+   def _mean_visibles(self, v, k):
     
 
     def _sample_visibles(self, h, rng):
