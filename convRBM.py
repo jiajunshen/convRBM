@@ -1,4 +1,4 @@
-"""Restricted Boltzmann Machine
+"""convolutional Restricted Boltzmann Machine
 """
 
 # Main author: Jiajun Shen<jiajun@cs.uchicago.edu>
@@ -172,8 +172,28 @@ class convRBM(BaseEstimator, TransformerMixin):
         h : array-like, shape (n_samples, n_components)
             Corresponding mean field values for the hidden layer.
         """
-        return logistic_sigmoid(conv(v, self.components_.T[k])
-                                + self.intercept_hidden_[k])
+        n_samples = v.shape[0]
+        activations = np.array([conv(v[i,:,:],self.components_[k]) + self.intercept_hidden_[i] for i in range(n_samples)])
+        return logistic_sigmoid(activations)
+
+    
+    def _mean_visible(self, h):
+        """
+        Computes the probabilities P(v=1|h).
+        
+        Parameters
+        ----------
+        h : array-like, shape (n_samples, n_groups, n_components)
+            values of the hidden layer.
+        
+        Returns
+        -------
+        v: array-like,shape (n_samples, n_features)
+        """
+        n_samples = h.shape[0]
+        activations = np.array([convExpendGroup(h[i],self.components_.T) + self.intercept_visible_ for i in range(n_samples)])
+        return logistic_sigmoid(activations) 
+
 
     def _gradience(v,mean_h):
         """Computer the gradience given the v and h.
@@ -191,6 +211,8 @@ class convRBM(BaseEstimator, TransformerMixin):
         """
         visibleData = v.reshape(n_samples, n_visible_windowSize,n_visible_windowSize)
         return np.array([conv(visibleData[i,:,:],mean_h[i]) for i in range(v.shape[0])])
+
+
 
 
     def _sample_hiddens(self, v, k, rng):
@@ -212,8 +234,6 @@ class convRBM(BaseEstimator, TransformerMixin):
         p = self._mean_hiddens(v,k)
         p[rng.uniform(size=p.shape) < p] = 1.
         return np.floor(p, p)
-   
-   def _mean_visibles(self, v, k):
     
 
     def _sample_visibles(self, h, rng):
