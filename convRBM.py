@@ -95,9 +95,10 @@ class convRBM(BaseEstimator, TransformerMixin):
     [4]
 
     """
-    def __init__(self, n_components=16, window_size = 5, learning_rate=0.1, batch_size=10,
+    def __init__(self, n_group = 16,n_components, window_size = 5, learning_rate=0.1, batch_size=10,
                  n_iter=10, verbose=False, random_state=None, getNum = 1):
         self.getNum = getNum
+        self.n_group = n_group
         self.n_components = n_components
         self.learning_rate = learning_rate
         self.batch_size = batch_size
@@ -106,9 +107,6 @@ class convRBM(BaseEstimator, TransformerMixin):
         self.verbose = verbose
         self.random_state = random_state
         
-    def printOutWeight(self):
-        gr.images(1000 * self.components_.reshape(self.n_components,16,16),zero_to_one = False, vmin = -2, vmax = 2)
-        #gr.images(self.components_.reshape(self.n_components,16,16))
     
     def gen_even_slices(self,n, n_packs, n_samples=None):
         """Generator to create n_packs slices going up to n.
@@ -140,7 +138,6 @@ class convRBM(BaseEstimator, TransformerMixin):
                 yield slice(start, end, None)
                 start = end
 
-        
 
 
     def transform(self, X):
@@ -173,7 +170,7 @@ class convRBM(BaseEstimator, TransformerMixin):
             Corresponding mean field values for the hidden layer.
         """
         n_samples = v.shape[0]
-        activations = np.array([conv(v[i,:,:],self.components_[k]) + self.intercept_hidden_[i] for i in range(n_samples)])
+        activations = np.array([conv(v[i,:],self.components_[k]) + self.intercept_hidden_[i] for i in range(n_samples)])
         return logistic_sigmoid(activations)
 
     
@@ -202,16 +199,19 @@ class convRBM(BaseEstimator, TransformerMixin):
         ----------
         v: array-like, shape (n_samples, n_features)
             values of the visible layer.
-        h: array-like, shape (n_samples, n_hidden_windowSize, n_hidden_windowSize)
+        h: array-like, shape (n_samples, n_components)
         
         Returns
         --------
-        Grad: array-like, shape(n_samples, weights_windowSize)        
+        Grad: array-like,shape (weight_windowSize, weight_windowSize)     
         
         """
         visibleData = v.reshape(n_samples, n_visible_windowSize,n_visible_windowSize)
-        return np.array([conv(visibleData[i,:,:],mean_h[i]) for i in range(v.shape[0])])
+        return np.array([conv(visibleData[i,:],mean_h[i,:]) for i in range(v.shape[0])]).sum(axis = 0)
 
+    def _bernoulliSample(self,p,rng):
+        p[rng.uniform(size = p.shape) < p] = 1.
+        return np.floor(p,p)
 
 
 
@@ -228,7 +228,7 @@ class convRBM(BaseEstimator, TransformerMixin):
 
         Returns
         -------
-        h : array-like, shape (n_samples, n_hidden_windowSize, n_hidden_windowSize)
+        h : array-like, shape (n_samples, n_components)
             Values of the hidden layer.
         """
         p = self._mean_hiddens(v,k)
@@ -257,7 +257,7 @@ class convRBM(BaseEstimator, TransformerMixin):
         p[rng.uniform(size=p.shape) < p] = 1.
         return np.floor(p, p)
 
-    def _free_energy(self, v):/
+    def _free_energy(self, v):
         """Computes the free energy F(v) = - log sum_h exp(-E(v,h)).
 
         Parameters
@@ -290,6 +290,25 @@ class convRBM(BaseEstimator, TransformerMixin):
             Values of the visible layer after one Gibbs step.
         """
         rng = check_random_state(self.random_state)
+        sample_H = []
+        gradience_Positive = []
+        gradience_Negtive = []
+        for i in range(self.n_group):
+            probability_H = self._mean_hiddens(v,i)
+            gradience_Positive += self._gradience(v,probability_H)
+            sample_H_k = self._bernoulliSample(probability_H)
+            sample_H += sample_H_k
+        
+        v_reconstruct = _mean_visibles(sample_H)
+
+        for j in range(self.n_group):
+            probability_H = self._mean_hidden(v_reconstruct,j)
+            gradience_Negtive += self._gradience(v_reconstruct, probability_H)
+            """
+            This is the place where you need to modify the weights
+            """
+
+
         h_ = self._sample_hiddens(v, rng)
         v_ = self._sample_visibles(h_, rng)
 
