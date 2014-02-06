@@ -139,8 +139,6 @@ class convRBM(BaseEstimator, TransformerMixin):
                 yield slice(start, end, None)
                 start = end
 
-
-    def getWeightsPrime(self):
         
 
 
@@ -176,8 +174,9 @@ class convRBM(BaseEstimator, TransformerMixin):
         return logistic_sigmoid(conv(v, self.components_.T[k])
                                 + self.intercept_hidden_[k])
 
-    def _gradience(v,h):
+    def _gradience(v,mean_h):
         """Computer the gradience given the v and h.
+        This is for getting the Grad0k./ If it is, we need to focus on the Ph0k
         Parameters
         ----------
         v: array-like, shape (n_samples, n_features)
@@ -190,7 +189,7 @@ class convRBM(BaseEstimator, TransformerMixin):
         
         """
         visibleData = v.reshape(n_samples, n_visible_windowSize,n_visible_windowSize)
-        return np.array([conv(visibleData[i,:,:],h[i]) for i in range(v.shape[0])])
+        return np.array([conv(visibleData[i,:,:],mean_h[i]) for i in range(v.shape[0])])
 
 
 
@@ -215,65 +214,6 @@ class convRBM(BaseEstimator, TransformerMixin):
         p[rng.uniform(size=p.shape) < p] = 1.
         return np.floor(p, p)
     
-    def _sample_hiddens_part(self,v,rng):
-        """Sample from the distribution P(h|v).
-        Parameters
-        ----------
-        v: array-like, shape(n_samples, n_features)
-           Values of the visible layer to sample from.
-
-        rng: RandomState
-            Random number generator to use.
-
-        Returns
-        -----
-        h : array-like, shape (n_samples, n_components)
-            Values of the hidden layer.
-        """    
-        p = self._mean_hiddens(v)
-        return self._sample_hiddens_winnerTakeAll(p,rng)
-        
-    def winner_take_all(self,proArray):
-        newArray = np.zeros(proArray.shape)
-        newArray = proArray
-        newArray = newArray/(sum(newArray))
-#        vote = numpy.random.multinomial(newArray.shape[0],newArray,1)
-        #vote = np.random.multinomial(newArray.shape[0],newArray,1)[0]
-
-
-        #print np.max(vote)
-#        getNum = self.n_components/10
-        sortedIndex = np.argsort(newArray)[::-1]
-        getNum = self.getNum
-        #print(getNum)
-        winner = np.zeros(proArray.shape[0])
-        winnerIndex = sortedIndex[:getNum]
-        winner[winnerIndex] = 1
-        #print winner
-        return winner.flatten()
-        
-    def _sample_hiddens_winnerTakeAll(self, h_pos_mean, rng):
-        """Sample from the distribution P(h|v).
-
-        Parameters
-        ----------
-        v : array-like, shape (n_samples, n_features)
-            Values of the visible layer to sample from.
-
-        rng : RandomState
-            Random number generator to use.
-
-        Returns
-        -------
-        h : array-like, shape (n_samples, n_components)
-            Values of the hidden layer.
-        """
-        p = h_pos_mean
-        newP = np.zeros(p.shape)
-        winner = map(self.winner_take_all,p)
-        winner = np.asarray(winner)
-        #print winner.shape
-        return winner
 
     def _sample_visibles(self, h, rng):
         """Sample from the distribution P(v|h).
@@ -296,7 +236,7 @@ class convRBM(BaseEstimator, TransformerMixin):
         p[rng.uniform(size=p.shape) < p] = 1.
         return np.floor(p, p)
 
-    def _free_energy(self, v):
+    def _free_energy(self, v):/
         """Computes the free energy F(v) = - log sum_h exp(-E(v,h)).
 
         Parameters
@@ -396,6 +336,12 @@ class convRBM(BaseEstimator, TransformerMixin):
         if self.verbose:
             return self.score_samples(v_pos)
 
+    
+
+
+
+
+
     def score_samples(self, v):
         """Compute the pseudo-likelihood of v.
 
@@ -423,7 +369,8 @@ class convRBM(BaseEstimator, TransformerMixin):
 	#print fe
         return v.shape[1] * logistic_sigmoid(fe_ - fe, log=True)
 
-    def fit(self, X, winnerTakeAll,plList, y=None,):
+
+    def fit(self, X, plList, y=None,):
         """Fit the model to the data X.
 
         Parameters
