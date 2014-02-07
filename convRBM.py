@@ -95,10 +95,10 @@ class convRBM(BaseEstimator, TransformerMixin):
     [4]
 
     """
-    def __init__(self, n_group = 16,n_components, window_size = 5, learning_rate=0.1, batch_size=10,
+    def __init__(self, n_groups = 16,n_components, window_size = 5, learning_rate=0.1, batch_size=10,
                  n_iter=10, verbose=False, random_state=None, getNum = 1):
         self.getNum = getNum
-        self.n_group = n_group
+        self.n_groups = n_group
         self.n_components = n_components
         self.learning_rate = learning_rate
         self.batch_size = batch_size
@@ -188,7 +188,7 @@ class convRBM(BaseEstimator, TransformerMixin):
         v: array-like,shape (n_samples, n_features)
         """
         n_samples = h.shape[0]
-        activations = np.array([convExpendGroup(h[i],self.components_.T) + self.intercept_visible_ for i in range(n_samples)])
+        activations = np.array([convExpendGroup(h[i],self.components_) + self.intercept_visible_ for i in range(n_samples)])
         return logistic_sigmoid(activations) 
 
 
@@ -203,11 +203,12 @@ class convRBM(BaseEstimator, TransformerMixin):
         
         Returns
         --------
-        Grad: array-like,shape (weight_windowSize, weight_windowSize)     
+        Grad: array-like,shape (weight_windowSize * weight_windowSize)     
         
         """
         visibleData = v.reshape(n_samples, n_visible_windowSize,n_visible_windowSize)
-        return np.array([conv(visibleData[i,:],mean_h[i,:]) for i in range(v.shape[0])]).sum(axis = 0)
+        weights =  np.array([conv(visibleData[i,:],mean_h[i,:]) for i in range(v.shape[0])]).sum(axis = 0) 
+        return np.ravel(weights)
 
     def _bernoulliSample(self,p,rng):
         p[rng.uniform(size = p.shape) < p] = 1.
@@ -276,26 +277,75 @@ class convRBM(BaseEstimator, TransformerMixin):
                 - np.log(1. + np.exp(safe_sparse_dot(v, self.components_.T)
                             + self.intercept_hidden_)).sum(axis=1))
 
-    def gibbs(self, v):
-        """Perform one Gibbs sampling step.
+    def fit(self, X):
+        """Fit the model to the data X.
 
         Parameters
         ----------
-        v : array-like, shape (n_samples, n_features)
-            Values of the visible layer to start from.
-
+        X : array-like, shape (n_samples, n_features)
+            Training Data
+        i
         Returns
         -------
-        v_new : array-like, shape (n_samples, n_features)
-            Values of the visible layer after one Gibbs step.
+        self: convolutionRBM
+              The fitted Model.
         """
+        X, = check_arrays(X, sparse_format = 'csr', dtype = np.float)
+        n_samples = X.shape[0]
         rng = check_random_state(self.random_state)
+        
+        self.components_ = np.asarray(
+            rng.normal(0, 0.001, (self.n_groups,self.window_size * self.window_size)),order='fortran')
+        self.intercept_hidden_ = np.zeros(self.n_groups, self.n_components)          
+
+        self.intercept_visible_ = np.zeros(X.shape[1],)
+                        
+
+        lr = float(self.learning_rate) / v.shape[0]
+        self.h_samples_ = np.zeros((self.batch_size, self.n_components))
+
+        n_batches = int(np.ceil(float(n_samples)/ self.batch_size))
+        batch_slices = list(self.gen_even_slices(n_batches * self.batch_size, n_batches, n_samples))
+       
+        verbose = self.verbose
+        
+        for iteration in xrange(1, self.n_iter + 1):
+            for batch_slice in batch_slices:
+                self._fit(X[batch_slice], rng)
+
+            if verbose:
+                end = time.time()
+                print("[%s] Iteration %d, pseudo-likelihood = %.2f,"
+                      " time = %.2fs"
+                      % (type(self).__name__, iteration,
+                         self.score_samples(X).mean(), end - begin))
+                begin = end
+
+        return self
+
+
+
+    def _fit(self, v_pos,rng):
+        """Inner fit for one mini-batch
+        
+        Adjust the parameters to maximize the likelihood of v using 
+        Stochastic CD gradient descent for learning binary CRBM's 
+        Weights
+
+        Parameters
+        -------------
+        v_pos: array-like, shape(n_samples, n_features)
+               the data to use for training.
+
+        rng: RandomState
+             Random number generator to use for sampling
+        """
         sample_H = []
         gradience_Positive = []
         gradience_Negtive = []
         for i in range(self.n_group):
-            probability_H = self._mean_hiddens(v,i)
-            gradience_Positive += self._gradience(v,probability_H)
+            probability_H = self._mean_hiddens(v_pos,i)
+            gradience_Positive += self._gradience(v_pos,probability_H)
             sample_H_k = self._bernoulliSample(probability_H)
             sample_H += sample_H_k
         
@@ -304,81 +354,9 @@ class convRBM(BaseEstimator, TransformerMixin):
         for j in range(self.n_group):
             probability_H = self._mean_hidden(v_reconstruct,j)
             gradience_Negtive += self._gradience(v_reconstruct, probability_H)
-            """
-            This is the place where you need to modify the weights
-            """
+            self.components_[j] += lr * (gradience_Positive - gradience_Negtive[j]) 
 
-
-        h_ = self._sample_hiddens(v, rng)
-        v_ = self._sample_visibles(h_, rng)
-
-        return v_
-
-    def _fit(self, v_pos, rng,winnerTakeAll):
-        """Inner fit for one mini-batch.
-
-        Adjust the parameters to maximize the likelihood of v using
-        Stochastic Maximum Likelihood (SML).
-
-        Parameters
-        ----------
-        v_pos : array-like, shape (n_samples, n_features)
-            The data to use for training.
-
-        rng : RandomState
-            Random number generator to use for sampling.
-
-        Returns
-        -------
-        pseudo_likelihood : array-like, shape (n_samples,)
-            If verbose=True, pseudo-likelihood estimate for this batch.
-        """
-#        h_pos = self._mean_hiddens(v_pos)
-#        h_pos = self._sample_hiddens_winnerTakeAll(v_pos,rng)
-        h_pos_mean_hidden = self._mean_hiddens(v_pos)
-	if(winnerTakeAll):
-            #print(sum(self._sample_hiddens_winnerTakeAll(v_pos,rng)))
-            h_pos = np.multiply(h_pos_mean_hidden, self._sample_hiddens_winnerTakeAll(h_pos_mean_hidden,rng))
-        else:
-            h_pos = h_pos_mean_hidden
-        v_neg = self._sample_visibles(self.h_samples_, rng)
-#       h_neg = self._mean_hiddens(v_neg)
-        
-	if(winnerTakeAll):
-	    h_neg_mean_hidden = self._mean_hiddens(v_neg)
-            h_neg_state = self._sample_hiddens_winnerTakeAll(h_neg_mean_hidden,rng)
-            h_neg = np.multiply(h_neg_mean_hidden,h_neg_state)
-        else:
-            h_neg = self._mean_hiddens(v_neg)
-    
-        lr = float(self.learning_rate) / v_pos.shape[0]
-        update = safe_sparse_dot(v_pos.T, h_pos, dense_output=True).T
-        update -= np.dot(v_neg.T, h_neg).T
-        #gr.images(lr* update)
-        #print update.shape
-	#gr.images(1000 * update.reshape(15,16,16))
-	#print update
-	self.components_ += lr * update
-        self.intercept_hidden_ += lr * (h_pos.sum(axis=0) - h_neg.sum(axis=0))
-        self.intercept_visible_ += lr * (np.asarray(
-                                         v_pos.sum(axis=0)).squeeze() -
-                                         v_neg.sum(axis=0))
-        
-#        h_neg[rng.uniform(size=h_neg.shape) < h_neg] = 1.0  # sample binomial
-#        self.h_samples_ = np.floor(h_neg, h_neg)
-        h_neg[rng.uniform(size=h_neg.shape) < h_neg] = 1.0
-        self.h_samples_ = np.floor(h_neg, h_neg)
-	if(winnerTakeAll):
-		self.h_samples_ = h_neg_state
-	
-		#print np.sum(self.h_samples_,axis = 1)
-		
-        if self.verbose:
-            return self.score_samples(v_pos)
-
-    
-
-
+        return
 
 
 
@@ -409,55 +387,3 @@ class convRBM(BaseEstimator, TransformerMixin):
 	#print fe
         return v.shape[1] * logistic_sigmoid(fe_ - fe, log=True)
 
-
-    def fit(self, X, plList, y=None,):
-        """Fit the model to the data X.
-
-        Parameters
-        ----------
-        X : {array-like, sparse matrix} shape (n_samples, n_features)
-            Training data.
-
-        Returns
-        -------
-        self : BernoulliRBM
-            The fitted model.
-        """
-        X, = check_arrays(X, sparse_format='csr', dtype=np.float)
-        n_samples = X.shape[0]
-        rng = check_random_state(self.random_state)
-
-        self.components_ = np.asarray(
-            rng.normal(0, 0.001, (self.n_components, X.shape[1])),
-            order='fortran')
-        self.intercept_hidden_ = np.zeros(self.n_components, )
-        self.intercept_visible_ = np.zeros(X.shape[1], )
-        self.h_samples_ = np.zeros((self.batch_size, self.n_components))
-
-        n_batches = int(np.ceil(float(n_samples) / self.batch_size))
-        batch_slices = list(self.gen_even_slices(n_batches * self.batch_size,n_batches, n_samples))
-        verbose = self.verbose
-        for iteration in xrange(self.n_iter):
-            pl = 0.
-            if verbose:
-                begin = time.time()
-	    
-	    batch_index = 0
-            for batch_slice in batch_slices:
-		if(batch_index + 1 != n_batches - 1):
-			#next_batch = batch_slice		
-        		next_h_pos_mean_hidden = self._mean_hiddens(X[batch_index + 1])
-                pl_batch = self._fit(X[batch_slice], rng,winnerTakeAll)
-		if verbose:
-                    pl += pl_batch.sum()
-                    #self.printOutWeight()
-		batch_index = batch_index + 1
-
-            if verbose:
-                pl /= n_samples
-                end = time.time()
-                print("Iteration %d, pseudo-likelihood = %.2f, time = %.2fs"
-                      % (iteration, pl, end - begin))
-                plList[iteration] = pl
-	    #self.printOutWeight()
-        return self
