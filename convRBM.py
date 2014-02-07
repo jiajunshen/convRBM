@@ -193,7 +193,7 @@ class convRBM(BaseEstimator, TransformerMixin):
         return logistic_sigmoid(activations) 
 
 
-    def _gradience(v,mean_h):
+    def _gradience(self,v,mean_h):
         """Computer the gradience given the v and h.
         This is for getting the Grad0k./ If it is, we need to focus on the Ph0k
         Parameters
@@ -207,8 +207,8 @@ class convRBM(BaseEstimator, TransformerMixin):
         Grad: array-like,shape (weight_windowSize * weight_windowSize)     
         
         """
-        visibleData = v.reshape(n_samples, n_visible_windowSize,n_visible_windowSize)
-        weights =  np.array([conv(visibleData[i,:],mean_h[i,:]) for i in range(v.shape[0])]).sum(axis = 0) 
+        n_samples = v.shape[0]
+        weights =  np.array([conv(v[i,:],mean_h[i,:]) for i in range(v.shape[0])]).sum(axis = 0) 
         return np.ravel(weights)
 
     def _bernoulliSample(self,p,rng):
@@ -302,7 +302,6 @@ class convRBM(BaseEstimator, TransformerMixin):
         self.intercept_visible_ = np.zeros(X.shape[1],)
                         
 
-        lr = float(self.learning_rate) / v.shape[0]
         self.h_samples_ = np.zeros((self.batch_size, self.n_components))
 
         n_batches = int(np.ceil(float(n_samples)/ self.batch_size))
@@ -344,6 +343,7 @@ class convRBM(BaseEstimator, TransformerMixin):
         sample_H = []
         gradience_Positive = []
         gradience_Negtive = []
+        lr = float(self.learning_rate) / v_pos.shape[0]
         for i in range(self.n_groups):
             probability_H = self._mean_hiddens(v_pos,i)
             gradience_Positive.append(self._gradience(v_pos,probability_H))
@@ -352,12 +352,12 @@ class convRBM(BaseEstimator, TransformerMixin):
        
         sample_H = np.array(sample_H)
         sample_H = np.swapaxes(sample_H, 0, 1) 
-        v_reconstruct = self._mean_visibles(np.array(sample_H))
+        v_reconstruct = self._mean_visibles(sample_H)
 
-        for j in range(self.n_group):
+        for j in range(self.n_groups):
             probability_H = self._mean_hiddens(v_reconstruct,j)
             gradience_Negtive.append(self._gradience(v_reconstruct, probability_H))
-            self.components_[j] += lr * (gradience_Positive - gradience_Negtive[j]) 
+            self.components_[j] += lr * (gradience_Positive[j] - gradience_Negtive[j]) 
 
         return
 

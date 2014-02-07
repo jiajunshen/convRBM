@@ -17,6 +17,15 @@ def testConvOperation():
     print conv(a.flatten(),b.flatten())
     print convExpend(a.flatten(),b.flatten())
 
+def testTotal():
+    r = testInit()
+    visibleNodes = np.ones((50,28,28))
+    for i in xrange(50):
+        visibleNodes[i,14,:] = 1
+    visibleNodes = visibleNodes.reshape(50,-1)
+    r.fit(visibleNodes)
+    return r
+
 def testInit():
     n_groups = 16
     n_components = 24 * 24
@@ -51,6 +60,14 @@ def testMeanVisible():
     sample_H = np.swapaxes(sample_H, 0, 1)
     return r._mean_visibles(sample_H)
 
+
+def testGradience():
+    r,hiddenMean = testMeanHidden()
+    visibleSamples = 20
+    visibleNodes = np.ones((20,28*28))
+    probability_H = r._mean_hiddens(visibleNodes,1)
+    gradience_Positive = r._gradience(visibleNodes, probability_H)
+    return visibleNodes, probability_H,gradience_Positive 
 
 
 
