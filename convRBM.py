@@ -16,7 +16,8 @@ from sklearn.utils import issparse
 from sklearn.utils.extmath import safe_sparse_dot
 from sklearn.utils.extmath import logistic_sigmoid
 from conv import conv
-from conv import convExpend
+from convExpend import convExpend
+from convExpend import convExpendGroup
 import amitgroup.plot as gr
 
 
@@ -95,10 +96,10 @@ class convRBM(BaseEstimator, TransformerMixin):
     [4]
 
     """
-    def __init__(self, n_groups = 16,n_components, window_size = 5, learning_rate=0.1, batch_size=10,
+    def __init__(self, n_groups,n_components, window_size = 5, learning_rate=0.1, batch_size=10,
                  n_iter=10, verbose=False, random_state=None, getNum = 1):
         self.getNum = getNum
-        self.n_groups = n_group
+        self.n_groups = n_groups
         self.n_components = n_components
         self.learning_rate = learning_rate
         self.batch_size = batch_size
@@ -170,11 +171,11 @@ class convRBM(BaseEstimator, TransformerMixin):
             Corresponding mean field values for the hidden layer.
         """
         n_samples = v.shape[0]
-        activations = np.array([conv(v[i,:],self.components_[k]) + self.intercept_hidden_[i] for i in range(n_samples)])
+        activations = np.array([conv(v[i,:],self.components_[k]) + self.intercept_hidden_[k] for i in range(n_samples)])
         return logistic_sigmoid(activations)
 
     
-    def _mean_visible(self, h):
+    def _mean_visibles(self, h):
         """
         Computes the probabilities P(v=1|h).
         
@@ -296,7 +297,7 @@ class convRBM(BaseEstimator, TransformerMixin):
         
         self.components_ = np.asarray(
             rng.normal(0, 0.001, (self.n_groups,self.window_size * self.window_size)),order='fortran')
-        self.intercept_hidden_ = np.zeros(self.n_groups, self.n_components)          
+        self.intercept_hidden_ = np.zeros((self.n_groups, self.n_components)) 
 
         self.intercept_visible_ = np.zeros(X.shape[1],)
                         
@@ -343,17 +344,19 @@ class convRBM(BaseEstimator, TransformerMixin):
         sample_H = []
         gradience_Positive = []
         gradience_Negtive = []
-        for i in range(self.n_group):
+        for i in range(self.n_groups):
             probability_H = self._mean_hiddens(v_pos,i)
-            gradience_Positive += self._gradience(v_pos,probability_H)
-            sample_H_k = self._bernoulliSample(probability_H)
-            sample_H += sample_H_k
-        
-        v_reconstruct = _mean_visibles(sample_H)
+            gradience_Positive.append(self._gradience(v_pos,probability_H))
+            sample_H_k = self._bernoulliSample(probability_H,rng)
+            sample_H.append(sample_H_k)
+       
+        sample_H = np.array(sample_H)
+        sample_H = np.swapaxes(sample_H, 0, 1) 
+        v_reconstruct = self._mean_visibles(np.array(sample_H))
 
         for j in range(self.n_group):
-            probability_H = self._mean_hidden(v_reconstruct,j)
-            gradience_Negtive += self._gradience(v_reconstruct, probability_H)
+            probability_H = self._mean_hiddens(v_reconstruct,j)
+            gradience_Negtive.append(self._gradience(v_reconstruct, probability_H))
             self.components_[j] += lr * (gradience_Positive - gradience_Negtive[j]) 
 
         return

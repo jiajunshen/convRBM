@@ -14,4 +14,4 @@ def conv(Z,Y):
     convedData = np.array([Z[i:i+windowSize,j:j+windowSize] for i in range(convedSize) for j in range(convedSize)])
     convedResult = np.array([(convedData[i,:,:] * Y).sum() for i in range(pow(convedSize,2))])
     convedResult = convedResult.reshape((convedSize,convedSize))
-    return convedResult
+    return np.ravel(convedResult)
