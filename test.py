@@ -3,6 +3,8 @@ import numpy as np
 from convExpend import convExpend
 from convRBM import convRBM
 from sklearn.utils import check_random_state
+import amitgroup.io.mnist as mn
+import time
 
 def testConvOperation():
     a = np.array((1,0,0,1,0,0,1,0,0))
@@ -16,6 +18,20 @@ def testConvOperation():
     print b
     print conv(a.flatten(),b.flatten())
     print convExpend(a.flatten(),b.flatten())
+
+def testConvSpeed():
+    a = np.ones(9)
+    a = np.array((a, 2*a, 3*a, 4*a, 5*a, 6*a, 7*a, 8*a, 9*a))
+    b = np.ones(3)
+    b = np.array((b,b,b))
+    a = a.reshape(9,9)
+    b = b.reshape(3,3)
+    current = time.time()
+    result = conv(a.flatten(),b.flatten())
+    for i in range(10000):
+        conv(a.flatten(),b.flatten())    
+    print time.time() - current
+    print result
 
 def testTotal():
     r = testInit()
@@ -32,7 +48,7 @@ def testInit():
     window_size = 5
     learning_rate = 0.1
     batch_size = 10
-    n_iter = 2
+    n_iter = 20
     verbose = False
     r = convRBM(n_groups = n_groups, n_components = n_components, window_size = window_size, learning_rate = learning_rate, batch_size = batch_size, n_iter = n_iter, verbose = verbose)
     return r
@@ -67,8 +83,27 @@ def testGradience():
     visibleNodes = np.ones((20,28*28))
     probability_H = r._mean_hiddens(visibleNodes,1)
     gradience_Positive = r._gradience(visibleNodes, probability_H)
-    return visibleNodes, probability_H,gradience_Positive 
+    return r,visibleNodes, probability_H,gradience_Positive
+    
+    
+def testRun():
+    r = testInit()
+    visibleSamples = 20
+    visibleNodes = np.zeros((20,28,28))
+    visibleNodes[:,14:16,:] = 1
+    visibleNodes = visibleNodes.reshape(20,28*28)
+    r.fit(visibleNodes)
+    return r
 
-
-
-
+def testRunMnist():
+    n_groups = 16
+    n_components = 24*24
+    window_size = 5
+    learning_rate = 0.1
+    batch_size = 50
+    n_iter = 20
+    r = convRBM(n_groups = n_groups, n_components = n_components, window_size = window_size, learning_rate = learning_rate, batch_size = batch_size, n_iter = n_iter, verbose = False)
+    digits = [0,1,2,3,4,5,6,7,8,9]
+    images,labels = mn.load_mnist('training',digits,'/Users/jiajunshen/Dropbox/Research/data/',False,slice(0,6000,5),True,False)
+    r.fit(images.reshape(1200,28*28))
+    return r

@@ -310,8 +310,10 @@ class convRBM(BaseEstimator, TransformerMixin):
         verbose = self.verbose
         
         for iteration in xrange(1, self.n_iter + 1):
+            reconstructError = 0
             for batch_slice in batch_slices:
-                self._fit(X[batch_slice], rng)
+                reconstructError += self._fit(X[batch_slice], rng)
+            print "step:", iteration, "reconstruct Error: ", reconstructError
 
             if verbose:
                 end = time.time()
@@ -353,13 +355,13 @@ class convRBM(BaseEstimator, TransformerMixin):
         sample_H = np.array(sample_H)
         sample_H = np.swapaxes(sample_H, 0, 1) 
         v_reconstruct = self._mean_visibles(sample_H)
-
         for j in range(self.n_groups):
             probability_H = self._mean_hiddens(v_reconstruct,j)
             gradience_Negtive.append(self._gradience(v_reconstruct, probability_H))
-            self.components_[j] += lr * (gradience_Positive[j] - gradience_Negtive[j]) 
+            
+            self.components_[j] += lr * (gradience_Positive[j] - gradience_Negtive[j])/self.n_components 
 
-        return
+        return np.sum((v_reconstruct - v_pos)) 
 
 
 
