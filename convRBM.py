@@ -18,6 +18,7 @@ from sklearn.utils.extmath import logistic_sigmoid
 from conv import conv
 from convExpend import convExpend
 from convExpend import convExpendGroup
+from convTheano import convTheano
 import amitgroup.plot as gr
 
 
@@ -97,7 +98,7 @@ class convRBM(BaseEstimator, TransformerMixin):
 
     """
     def __init__(self, n_groups,n_components, window_size = 5, learning_rate=0.1, batch_size=10,
-                 n_iter=10, verbose=False, random_state=None, getNum = 1):
+                 n_iter=10, verbose=False, random_state=None, use_theano = True):
         self.getNum = getNum
         self.n_groups = n_groups
         self.n_components = n_components
@@ -107,6 +108,7 @@ class convRBM(BaseEstimator, TransformerMixin):
         self.window_size = window_size
         self.verbose = verbose
         self.random_state = random_state
+        self.use_theano = use_theano
         
     
     def gen_even_slices(self,n, n_packs, n_samples=None):
@@ -312,7 +314,11 @@ class convRBM(BaseEstimator, TransformerMixin):
         for iteration in xrange(1, self.n_iter + 1):
             reconstructError = 0
             for batch_slice in batch_slices:
-                reconstructError += self._fit(X[batch_slice], rng)
+                if(!self.use_theano):
+                    reconstructError += self._fit(X[batch_slice], rng)
+                else
+                    reconstructError += self._fit_theano(X[batch_slice],rng)
+
             print "step:", iteration, "reconstruct Error: ", reconstructError
 
             if verbose:
@@ -363,7 +369,36 @@ class convRBM(BaseEstimator, TransformerMixin):
 
         return np.sum((v_reconstruct - v_pos)) 
 
+    def _fit_theano(self,v_pos,rng):
+        """Inner fit for one mini-batch using theano
 
+        Adjust the parameters to maximize the likelihood of v using 
+        Stochastic CD gradient descent for learning binary CRBM's 
+        Weights
+
+        Parameters
+        -------------
+        v_pos: array-like, shape(n_samples, n_features)
+               the data to use for training.
+
+        rng: RandomState
+             Random number generator to use for sampling
+        """
+        lr = float(self.learning_rate) / v_pos.shape[0]
+        probability_H_Positive = self._mean_hiddens_theano(v_pos)
+        gradience_Positive = self._gradience_theano(v_pos,probability_H_Positive)
+        sample_H = self._bernoulliSample(probability_H_Positive,rng)
+
+        v_reconstruct = self._mean_visible_theano(sample_H)
+        
+        probability_H_Negtive = self._mean_hiddens_theano(v_reconstruct)
+        gradience_Negtive = self._gradience_theano(v_reconstruct,probability_H_Negtive)
+        
+        self.components_ += lr * (gradience_Positive - gradience_Negtive)/self.n_components
+
+        return np.sum((v_reconstruct - v_pos))
+
+        
 
     def score_samples(self, v):
         """Compute the pseudo-likelihood of v.
