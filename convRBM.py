@@ -98,7 +98,7 @@ class convRBM(BaseEstimator, TransformerMixin):
 
     """
     def __init__(self, n_groups,n_components, window_size = 5, learning_rate=0.1, batch_size=10,
-                 n_iter=10, verbose=False, random_state=None, use_theano = True):
+                 n_iter=10, verbose=False, random_state=None, use_theano = False, getNum = 1):
         self.getNum = getNum
         self.n_groups = n_groups
         self.n_components = n_components
@@ -259,7 +259,7 @@ class convRBM(BaseEstimator, TransformerMixin):
         weights =  np.array([conv(v[i,:],mean_h[i,:]) for i in range(v.shape[0])]).sum(axis = 0) 
         return np.ravel(weights)
 
-    def _gradience_theano(self,v,mean_h)
+    def _gradience_theano(self,v,mean_h):
         """Computer the gradience given the v and h.
         This is for getting the Grad0k./ If it is, we need to focus on the Ph0k
         Parameters
@@ -378,9 +378,9 @@ class convRBM(BaseEstimator, TransformerMixin):
         for iteration in xrange(1, self.n_iter + 1):
             reconstructError = 0
             for batch_slice in batch_slices:
-                if(!self.use_theano):
+                if(not self.use_theano):
                     reconstructError += self._fit(X[batch_slice], rng)
-                else
+                else:
                     reconstructError += self._fit_theano(X[batch_slice],rng)
 
             print "step:", iteration, "reconstruct Error: ", reconstructError

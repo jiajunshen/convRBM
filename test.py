@@ -2,6 +2,7 @@ from conv import conv
 import numpy as np
 from convExpend import convExpend
 from convRBM import convRBM
+from convTheano import convTheano
 from sklearn.utils import check_random_state
 import amitgroup.io.mnist as mn
 import time
@@ -18,6 +19,22 @@ def testConvOperation():
     print b
     print conv(a.flatten(),b.flatten())
     print convExpend(a.flatten(),b.flatten())
+
+def testConvTheano(border = 'valid'):
+    a = np.array((1,0,1,0,1,0))
+    b = np.array((0,1,0,1,0,1))
+    A = np.array((a,b,a,b,a,b))
+    B = np.array((b,a,b,a,b,a))
+    c = np.array((1,1,1))
+    C = np.array((c,c,c))
+    D = np.zeros((3,3))
+    D[1,1] = 1
+    Z = np.array((A,B))
+    print Z.shape
+    Y = np.array((C,D))
+    print Y.shape
+    return convTheano(Z.reshape(2,-1),Y.reshape(2,-1))
+
 
 def testConvSpeed():
     a = np.ones(9)
@@ -42,7 +59,7 @@ def testTotal():
     r.fit(visibleNodes)
     return r
 
-def testInit():
+def testInit(useTheano = False):
     n_groups = 16
     n_components = 24 * 24
     window_size = 5
@@ -50,7 +67,7 @@ def testInit():
     batch_size = 10
     n_iter = 20
     verbose = False
-    r = convRBM(n_groups = n_groups, n_components = n_components, window_size = window_size, learning_rate = learning_rate, batch_size = batch_size, n_iter = n_iter, verbose = verbose)
+    r = convRBM(n_groups = n_groups, n_components = n_components, window_size = window_size, learning_rate = learning_rate, batch_size = batch_size, n_iter = n_iter, verbose = verbose, use_theano = useTheano)
     return r
 
 def testMeanHidden():
@@ -64,6 +81,16 @@ def testMeanHidden():
     hiddenMean = r._mean_hiddens(visibleNodes,1)
     return r, hiddenMean
 
+def testMeanHiddenTheano():
+    r = testInit(useTheano = True)
+    rng = check_random_state(r.random_state)
+    visibleSamples = 20
+    r.components_ = np.asarray(rng.normal(0,0.01,(r.n_groups,r.window_size * r.window_size)),order = 'fortran')
+    r.intercept_hidden_=np.zeros((r.n_groups,r.n_components))
+    r.intercept_visible_=np.zeros(28*28)
+    visibleNodes = np.ones((20,28*28))
+    hiddenMean = r._mean_hiddens_theano(visibleNodes)
+    return r,hiddenMean
 
 def testMeanVisible():
     r,hiddenMean = testMeanHidden()

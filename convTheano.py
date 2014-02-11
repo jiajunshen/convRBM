@@ -2,8 +2,9 @@ import theano.tensor as T
 from theano.tensor.nnet import conv
 import numpy as np
 from math import sqrt
+import theano
 
-def convTheano(Z,Y,flip=False,boarder='valid'):
+def convTheano(Z,Y,flip=False,border='valid'):
     """
     Take Z = array(batch_size, n_z * n_z) input imageand Y = array(nb_filters, n_y * n_y) 
     convolution filter and do convolution operation. The result should
@@ -22,7 +23,7 @@ def convTheano(Z,Y,flip=False,boarder='valid'):
 
     windowSize = int(sqrt(Y.shape[1]))
     visualSize = int(sqrt(Z.shape[1]))
-    if(boarder=='valid'):
+    if(border=='valid'):
         convedSize = visualSize - windowSize + 1
     else:
         convedSize = visualSize + windowSize - 1
@@ -32,7 +33,7 @@ def convTheano(Z,Y,flip=False,boarder='valid'):
 
     x = T.tensor4(name = 'x')
     y = T.tensor4(name = 'y')
-    output = conv.conv2d(x,y,boarder_mode = boarder)
+    output = conv.conv2d(x,y,border_mode = border)
     f = theano.function([x,y],output)
     
     Z = Z.reshape(batch_size,1,visualSize,visualSize)
@@ -45,7 +46,7 @@ def convTheano(Z,Y,flip=False,boarder='valid'):
     result = np.array(result).reshape(batch_size,nb_filters,convedSize * convedSize)
     if(labelZ):
         return result.reshape(nb_filters,convedSize * convedSize)
-    else if(labelY):
+    elif(labelY):
         return result.reshape(batch_size,convedSize * convedSize)
     else:
         return result
