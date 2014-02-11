@@ -1,7 +1,7 @@
 import numpy as np
 from math import sqrt
 def conv(Z,Y):
-# Take Z = array(n_z, n_z) input imageand Y = array(n_y, n_y) 
+# Take Z = array(n_z * n_z) input imageand Y = array(n_y * n_y) 
 # convolution filter and do convolution operation. The result should
 # be n_z - n_y + 1; For eg, the input layer consists of an Nv*Nv
 # array of binary units. Each group of hidens is associated with a 

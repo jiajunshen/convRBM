@@ -20,7 +20,7 @@ from convExpend import convExpend
 from convExpend import convExpendGroup
 from convTheano import convTheano
 import amitgroup.plot as gr
-
+from math import sqrt
 
 class convRBM(BaseEstimator, TransformerMixin):
     """convolutional Restricted Boltzmann Machine (RBM).
@@ -175,7 +175,23 @@ class convRBM(BaseEstimator, TransformerMixin):
         n_samples = v.shape[0]
         activations = np.array([conv(v[i,:],self.components_[k]) + self.intercept_hidden_[k] for i in range(n_samples)])
         return logistic_sigmoid(activations)
+    
+    def _mean_hiddens_theano(self,v):
+        """Computes the probabilities P(h=1|v).
+        
+        Parameters
+        ----------
+        v : array-like, shape (n_samples, n_features)
+            Values of the visible layer.
 
+        Returns
+        -------
+        h : array-like, shape (n_samples, n_groups, n_components)
+            Corresponding mean field values for the hidden layer.
+            
+        """
+        activations = convTheano(v,self.components_) + self.intercept_hidden_
+        return logistic_sigmoid(activations)
     
     def _mean_visibles(self, h):
         """
@@ -193,6 +209,36 @@ class convRBM(BaseEstimator, TransformerMixin):
         n_samples = h.shape[0]
         activations = np.array([convExpendGroup(h[i],self.components_) + self.intercept_visible_ for i in range(n_samples)])
         return logistic_sigmoid(activations) 
+
+    def _mean_visibles_theano(self,h,v):
+        """
+        Computes the probabilities P(v=1|h).
+        
+        Parameters
+        ----------
+        h : array-like, shape (n_samples, n_groups, n_components)
+            values of the hidden layer.
+        v : The input original Visible Nodes
+        Returns
+        -------
+        v: array-like,shape (n_samples, n_features)        
+        """
+        activations = np.array([convTheano(h[:,i,:],self.components_[i],flip = True) + self.intercept_visible_[i] for i in range(self.n_groups)]).sum(axis = 0)
+        visibles = v
+        windowSize = int(sqrt(self.n_components))
+        visualSize = int(sqrt(v.shape[1]))
+        innerSize = visualSize - 2 * windowSize + 2
+        n_sample = v.shape[0]
+    
+        innerV = logistic_sigmoid(activations)
+        innerV = innerV.reshape(n_sample,innerSize, innerSize)
+        visibles = visibles.reshape(n_sample,visualSize,visualSize)
+        
+        visibles[:,windowSize - 1: visualSize - windowSize + 1,windowSize - 1: visualSize - windowSize + 1] = innerV
+        visibles = visibles.reshape(n_sample, -1)
+        
+        return visibles
+
 
 
     def _gradience(self,v,mean_h):
@@ -212,6 +258,24 @@ class convRBM(BaseEstimator, TransformerMixin):
         n_samples = v.shape[0]
         weights =  np.array([conv(v[i,:],mean_h[i,:]) for i in range(v.shape[0])]).sum(axis = 0) 
         return np.ravel(weights)
+
+    def _gradience_theano(self,v,mean_h)
+        """Computer the gradience given the v and h.
+        This is for getting the Grad0k./ If it is, we need to focus on the Ph0k
+        Parameters
+        ----------
+        v: array-like, shape (n_samples, n_features)
+            values of the visible layer.
+        h: array-like, shape (n_samples, n_groups, n_components)
+        
+        Returns
+        --------
+        Grad: array-like,shape (n_groups, weight_windowSize * weight_windowSize)     
+        
+        """
+        weights = np.array([conv_theano(v[i,:],mean_h[i,:,:]) for i in range(v.shape[0])]).sum(axis = 0)
+        return weights
+
 
     def _bernoulliSample(self,p,rng):
         p[rng.uniform(size = p.shape) < p] = 1.
@@ -389,7 +453,7 @@ class convRBM(BaseEstimator, TransformerMixin):
         gradience_Positive = self._gradience_theano(v_pos,probability_H_Positive)
         sample_H = self._bernoulliSample(probability_H_Positive,rng)
 
-        v_reconstruct = self._mean_visible_theano(sample_H)
+        v_reconstruct = self._mean_visibles_theano(sample_H,v_pos)
         
         probability_H_Negtive = self._mean_hiddens_theano(v_reconstruct)
         gradience_Negtive = self._gradience_theano(v_reconstruct,probability_H_Negtive)
