@@ -6,6 +6,7 @@ from convTheano import convTheano
 from sklearn.utils import check_random_state
 import amitgroup.io.mnist as mn
 import time
+import os
 
 def testConvOperation():
     a = np.array((1,0,0,1,0,0,1,0,0))
@@ -103,6 +104,14 @@ def testMeanVisible():
     sample_H = np.swapaxes(sample_H, 0, 1)
     return r._mean_visibles(sample_H)
 
+def testMeanVisibleTheano():
+    r,hiddenMean = testMeanHiddenTheano()
+    visibleNodes = np.ones((20,28*28))
+    rng = check_random_state(r.random_state)
+    sample_H = r._bernoulliSample(hiddenMean,rng)
+    
+    result = r._mean_visibles_theano(sample_H,visibleNodes)
+    return result
 
 def testGradience():
     r,hiddenMean = testMeanHidden()
@@ -112,7 +121,17 @@ def testGradience():
     gradience_Positive = r._gradience(visibleNodes, probability_H)
     return r,visibleNodes, probability_H,gradience_Positive
     
-    
+def testGradienceTheano():
+    r,hiddenMean = testMeanHiddenTheano()
+    visibleSamples = 20
+    visibleNodes = np.ones((20,28*28))
+    probability_H = hiddenMean
+    gradience_Positive = r._gradience_theano(visibleNodes, probability_H)
+    return gradience_Positive
+
+
+
+ 
 def testRun():
     r = testInit()
     visibleSamples = 20
@@ -121,6 +140,16 @@ def testRun():
     visibleNodes = visibleNodes.reshape(20,28*28)
     r.fit(visibleNodes)
     return r
+
+def testRunTheano():
+    r = testInit(useTheano = True)
+    visibleSamples = 20
+    visibleNodes = np.zeros((20,28,28))
+    visibleNodes[:,14:16,:] = 1
+    visibleNodes = visibleNodes.reshape(20,28*28)
+    r.fit(visibleNodes)
+    return r
+
 
 def testRunMnist():
     n_groups = 16
@@ -132,5 +161,17 @@ def testRunMnist():
     r = convRBM(n_groups = n_groups, n_components = n_components, window_size = window_size, learning_rate = learning_rate, batch_size = batch_size, n_iter = n_iter, verbose = False)
     digits = [0,1,2,3,4,5,6,7,8,9]
     images,labels = mn.load_mnist('training',digits,'/Users/jiajunshen/Dropbox/Research/data/',False,slice(0,6000,5),True,False)
+    return r
+
+def testRunMnistTheano():
+    n_groups = 16
+    n_components = 24 * 24
+    window_size = 5
+    learning_rate = 0.1
+    batch_size = 50
+    n_iter = 20
+    r = convRBM(n_groups = n_groups, n_components = n_components, window_size = window_size, learning_rate = learning_rate, batch_size = batch_size, n_iter = n_iter, verbose = False,use_theano = True)
+    digits = [0,1,2,3,4,5,6,7,8,9]
+    images,labels = mn.load_mnist('training',digits,os.environ['MNIST'],False,slice(0,6000,5),True,False)
     r.fit(images.reshape(1200,28*28))
     return r

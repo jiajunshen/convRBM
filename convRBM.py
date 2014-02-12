@@ -191,7 +191,8 @@ class convRBM(BaseEstimator, TransformerMixin):
             
         """
         activations = convTheano(v,self.components_) + self.intercept_hidden_
-        return logistic_sigmoid(activations)
+        n_samples = v.shape[0]
+        return logistic_sigmoid(activations.reshape(n_samples * self.n_groups, self.n_components)).reshape(n_samples,self.n_groups,self.n_components)
     
     def _mean_visibles(self, h):
         """
@@ -224,12 +225,11 @@ class convRBM(BaseEstimator, TransformerMixin):
         v: array-like,shape (n_samples, n_features)        
         """
         activations = np.array([convTheano(h[:,i,:],self.components_[i],flip = True) + self.intercept_visible_[i] for i in range(self.n_groups)]).sum(axis = 0)
-        visibles = v
-        windowSize = int(sqrt(self.n_components))
+        visibles = np.array(v)
+        windowSize = self.window_size
         visualSize = int(sqrt(v.shape[1]))
         innerSize = visualSize - 2 * windowSize + 2
         n_sample = v.shape[0]
-    
         innerV = logistic_sigmoid(activations)
         innerV = innerV.reshape(n_sample,innerSize, innerSize)
         visibles = visibles.reshape(n_sample,visualSize,visualSize)
@@ -273,7 +273,7 @@ class convRBM(BaseEstimator, TransformerMixin):
         Grad: array-like,shape (n_groups, weight_windowSize * weight_windowSize)     
         
         """
-        weights = np.array([conv_theano(v[i,:],mean_h[i,:,:]) for i in range(v.shape[0])]).sum(axis = 0)
+        weights = np.array([convTheano(v[i,:],mean_h[i,:,:]) for i in range(v.shape[0])]).sum(axis = 0)
         return weights
 
 
