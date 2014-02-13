@@ -165,8 +165,8 @@ def testRunMnist():
 
 def testRunMnistTheano():
     n_groups = 16
-    n_components = 24 * 24
-    window_size = 5
+    n_components = 22 * 22
+    window_size = 7
     learning_rate = 0.1
     batch_size = 50
     n_iter = 200
