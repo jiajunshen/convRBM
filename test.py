@@ -66,7 +66,7 @@ def testInit(useTheano = False):
     window_size = 5
     learning_rate = 0.1
     batch_size = 10
-    n_iter = 20
+    n_iter = 1000
     verbose = False
     r = convRBM(n_groups = n_groups, n_components = n_components, window_size = window_size, learning_rate = learning_rate, batch_size = batch_size, n_iter = n_iter, verbose = verbose, use_theano = useTheano)
     return r
@@ -169,7 +169,7 @@ def testRunMnistTheano():
     window_size = 5
     learning_rate = 0.1
     batch_size = 50
-    n_iter = 20
+    n_iter = 200
     r = convRBM(n_groups = n_groups, n_components = n_components, window_size = window_size, learning_rate = learning_rate, batch_size = batch_size, n_iter = n_iter, verbose = False,use_theano = True)
     digits = [0,1,2,3,4,5,6,7,8,9]
     images,labels = mn.load_mnist('training',digits,os.environ['MNIST'],False,slice(0,6000,5),True,False)

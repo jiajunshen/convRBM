@@ -21,6 +21,7 @@ from convExpend import convExpendGroup
 from convTheano import convTheano
 import amitgroup.plot as gr
 from math import sqrt
+from math import pow
 
 class convRBM(BaseEstimator, TransformerMixin):
     """convolutional Restricted Boltzmann Machine (RBM).
@@ -459,8 +460,10 @@ class convRBM(BaseEstimator, TransformerMixin):
         gradience_Negtive = self._gradience_theano(v_reconstruct,probability_H_Negtive)
         
         self.components_ += lr * (gradience_Positive - gradience_Negtive)/self.n_components
-
-        return np.sum((v_reconstruct - v_pos))
+        
+        self.intercept_hidden_ += lr * (probability_H_Positive.sum(axis = 0) - probability_H_Negtive.sum(axis = 0))
+        self.intercept_visible_ += lr * (v_pos.sum(axis = 0) - v_reconstruct.sum(axis = 0)) 
+        return np.sum((v_pos - v_reconstruct) ** 2)
 
         
 
