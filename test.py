@@ -87,8 +87,8 @@ def testMeanHiddenTheano():
     rng = check_random_state(r.random_state)
     visibleSamples = 20
     r.components_ = np.asarray(rng.normal(0,0.01,(r.n_groups,r.window_size * r.window_size)),order = 'fortran')
-    r.intercept_hidden_=np.zeros((r.n_groups,r.n_components))
-    r.intercept_visible_=np.zeros(28*28)
+    r.intercept_hidden_=np.zeros((r.n_groups))
+    r.intercept_visible_=0
     visibleNodes = np.ones((20,28*28))
     hiddenMean = r._mean_hiddens_theano(visibleNodes)
     return r,hiddenMean
@@ -165,8 +165,8 @@ def testRunMnist():
 
 def testRunMnistTheano():
     n_groups = 16
-    n_components = 22 * 22
-    window_size = 7
+    n_components = 24 * 24
+    window_size = 5
     learning_rate = 0.1
     batch_size = 50
     n_iter = 200

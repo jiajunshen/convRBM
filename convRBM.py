@@ -191,7 +191,8 @@ class convRBM(BaseEstimator, TransformerMixin):
             Corresponding mean field values for the hidden layer.
             
         """
-        activations = convTheano(v,self.components_) + self.intercept_hidden_
+        activationsWithoutIntercept = convTheano(v,self.components_)
+        activations = np.array([activationsWithoutIntercept[:,i,:] + self.intercept_hidden_[i] for i in range(self.n_groups)])
         n_samples = v.shape[0]
         return logistic_sigmoid(activations.reshape(n_samples * self.n_groups, self.n_components)).reshape(n_samples,self.n_groups,self.n_components)
     
@@ -225,7 +226,7 @@ class convRBM(BaseEstimator, TransformerMixin):
         -------
         v: array-like,shape (n_samples, n_features)        
         """
-        activations = np.array([convTheano(h[:,i,:],self.components_[i],flip = True) + self.intercept_visible_[i] for i in range(self.n_groups)]).sum(axis = 0)
+        activations = np.array([convTheano(h[:,i,:],self.components_[i],flip = True) + self.intercept_visible_ for i in range(self.n_groups)]).sum(axis = 0)
         visibles = np.array(v)
         windowSize = self.window_size
         visualSize = int(sqrt(v.shape[1]))
@@ -364,9 +365,9 @@ class convRBM(BaseEstimator, TransformerMixin):
         
         self.components_ = np.asarray(
             rng.normal(0, 0.001, (self.n_groups,self.window_size * self.window_size)),order='fortran')
-        self.intercept_hidden_ = np.zeros((self.n_groups, self.n_components)) 
+        self.intercept_hidden_ = np.zeros(self.n_groups) 
 
-        self.intercept_visible_ = np.zeros(X.shape[1],)
+        self.intercept_visible_ = 0
                         
 
         self.h_samples_ = np.zeros((self.batch_size, self.n_components))
@@ -461,8 +462,8 @@ class convRBM(BaseEstimator, TransformerMixin):
         
         self.components_ += lr * (gradience_Positive - gradience_Negtive)/self.n_components
         
-        self.intercept_hidden_ += lr * (probability_H_Positive.sum(axis = 0) - probability_H_Negtive.sum(axis = 0))
-        self.intercept_visible_ += lr * (v_pos.sum(axis = 0) - v_reconstruct.sum(axis = 0)) 
+        self.intercept_hidden_ += lr * ((probability_H_Positive.sum(axis = 0) - probability_H_Negtive.sum(axis = 0))).sum(axis = -1) / self.n_components
+        self.intercept_visible_ += lr * (v_pos.sum(axis = 0) - v_reconstruct.sum(axis = 0)).sum(axis = -1) / v_pos.shape[1]
         return np.sum((v_pos - v_reconstruct) ** 2)
 
         

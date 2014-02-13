@@ -31,14 +31,15 @@ def convTheano(Z,Y,flip=False,border='valid'):
     batch_size = Z.shape[0]
     nb_filters = Y.shape[0]
 
-    x = T.tensor4(name = 'x')
-    y = T.tensor4(name = 'y')
+    x = T.tensor4(name = 'x',dtype = 'float32')
+    y = T.tensor4(name = 'y',dtype = 'float32')
     output = conv.conv2d(x,y,border_mode = border)
     f = theano.function([x,y],output)
     
     Z = Z.reshape(batch_size,1,visualSize,visualSize)
     Y = Y.reshape(nb_filters,1,windowSize,windowSize)
-    
+    Z = np.float32(Z)
+    Y = np.float32(Y) 
     if(flip):
         Y = np.array([np.flipud(np.fliplr(Y[i,0,:,:])) for i in range(nb_filters)]).reshape(nb_filters,1,windowSize,windowSize)
 
