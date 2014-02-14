@@ -31,9 +31,9 @@ def testConvTheano(border = 'valid'):
     D = np.zeros((3,3))
     D[1,1] = 1
     Z = np.array((A,B))
-    print Z.shape
+    #print Z.shape
     Y = np.array((C,D))
-    print Y.shape
+    #print Y.shape
     return convTheano(Z.reshape(2,-1),Y.reshape(2,-1))
 
 
@@ -45,10 +45,13 @@ def testConvSpeed():
     a = a.reshape(9,9)
     b = b.reshape(3,3)
     current = time.time()
-    result = conv(a.flatten(),b.flatten())
-    for i in range(10000):
-        conv(a.flatten(),b.flatten())    
+    
+    for i in range(10000): 
+        result = conv(a.flatten(),b.flatten())
     print time.time() - current
+    current = time.time()
+    testConvTheano()
+    print time.time()-current
     print result
 
 def testTotal():
@@ -172,6 +175,6 @@ def testRunMnistTheano():
     n_iter = 200
     r = convRBM(n_groups = n_groups, n_components = n_components, window_size = window_size, learning_rate = learning_rate, batch_size = batch_size, n_iter = n_iter, verbose = False,use_theano = True)
     digits = [0,1,2,3,4,5,6,7,8,9]
-    images,labels = mn.load_mnist('training',digits,os.environ['MNIST'],False,slice(0,6000,5),True,False)
+    images,labels = mn.load_mnist('training',digits,'/home/jiajun/mnist',False,slice(0,6000,5),True,False)
     r.fit(images.reshape(1200,28*28))
     return r
