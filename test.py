@@ -1,3 +1,4 @@
+import theano
 from conv import conv
 import numpy as np
 from convExpend import convExpend
