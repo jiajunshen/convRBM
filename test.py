@@ -133,6 +133,21 @@ def testGradienceTheano():
     gradience_Positive = r._gradience_theano(visibleNodes, probability_H)
     return gradience_Positive
 
+def testConvTheanoMulti():
+    visibleSample = 3
+    visibleNodes = np.ones((3,28*28))
+    h = np.arange(5 * 24 * 24)
+    h = h.reshape(5,24 * 24)
+    h = np.array((h,2 * h, 3* h))
+    current = time.time()
+    for i in range(1000):
+        a =  np.array([convTheano(visibleNodes[i,:],h[i,:,:]) for i in range(3)])
+    print time.time()-current
+    current = time.time()
+    for i in range(1000):
+        b = convTheano(visibleNodes,h.reshape(3*5,24*24))
+    print time.time()-current
+    return a,b
 
 
  
@@ -172,10 +187,10 @@ def testRunMnistTheano():
     n_components = 24 * 24
     window_size = 5
     learning_rate = 0.1
-    batch_size = 50
+    batch_size = 20
     n_iter = 200
     r = convRBM(n_groups = n_groups, n_components = n_components, window_size = window_size, learning_rate = learning_rate, batch_size = batch_size, n_iter = n_iter, verbose = False,use_theano = True)
     digits = [0,1,2,3,4,5,6,7,8,9]
-    images,labels = mn.load_mnist('training',digits,'/home/jiajun/mnist',False,slice(0,6000,5),True,False)
+    images,labels = mn.load_mnist('training',digits,'/Users/jiajunshen/Dropbox/Research/data/',False,slice(0,6000,5),True,False)
     r.fit(images.reshape(1200,28*28))
     return r

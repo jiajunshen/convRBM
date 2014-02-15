@@ -226,14 +226,15 @@ class convRBM(BaseEstimator, TransformerMixin):
         -------
         v: array-like,shape (n_samples, n_features)        
         """
-        activations = np.array([convTheano(h[:,i,:],self.components_[i],flip = True) + self.intercept_visible_ for i in range(self.n_groups)]).sum(axis = 0)
+        activations = np.array([convTheano(h[:,i,:],self.components_[i],border='full') + self.intercept_visible_ for i in range(self.n_groups)]).sum(axis = 0)
+        
         visibles = np.array(v)
         windowSize = self.window_size
         visualSize = int(sqrt(v.shape[1]))
         innerSize = visualSize - 2 * windowSize + 2
         n_sample = v.shape[0]
         innerV = logistic_sigmoid(activations)
-        innerV = innerV.reshape(n_sample,innerSize, innerSize)
+        innerV = innerV.reshape(n_sample,visualSize, visualSize)[:,windowSize - 1:visualSize - windowSize + 1, windowSize - 1: visualSize - windowSize + 1]
         visibles = visibles.reshape(n_sample,visualSize,visualSize)
         
         visibles[:,windowSize - 1: visualSize - windowSize + 1,windowSize - 1: visualSize - windowSize + 1] = innerV
@@ -275,7 +276,11 @@ class convRBM(BaseEstimator, TransformerMixin):
         Grad: array-like,shape (n_groups, weight_windowSize * weight_windowSize)     
         
         """
-        weights = np.array([convTheano(v[i,:],mean_h[i,:,:]) for i in range(v.shape[0])]).sum(axis = 0)
+        #weights = np.array([convTheano(v[i,:],mean_h[i,:,:]) for i in range(v.shape[0])]).sum(axis = 0)
+        tempWeights = convTheano(v,mean_h.reshape(v.shape[0] * self.n_groups,self.n_components)).reshape(v.shape[0],v.shape[0],self.n_groups,-1)
+        #tempWeights = np.array([tempWeights[i,i,:,:] for i in range(v.shape[0])])
+        tempWeights = tempWeights[0]
+        weights = tempWeights.sum(axis = 0)
         return weights
 
 
@@ -365,7 +370,7 @@ class convRBM(BaseEstimator, TransformerMixin):
         
         self.components_ = np.asarray(
             rng.normal(0, 0.001, (self.n_groups,self.window_size * self.window_size)),order='fortran')
-        self.intercept_hidden_ = np.zeros(self.n_groups) 
+        self.intercept_hidden_ = np.zeros(self.n_groups)
 
         self.intercept_visible_ = 0
                         
@@ -451,19 +456,32 @@ class convRBM(BaseEstimator, TransformerMixin):
              Random number generator to use for sampling
         """
         lr = float(self.learning_rate) / v_pos.shape[0]
+        current = time.time()
         probability_H_Positive = self._mean_hiddens_theano(v_pos)
+        #print time.time() - current
+        current = time.time()
         gradience_Positive = self._gradience_theano(v_pos,probability_H_Positive)
+        #print time.time() - current
+        current = time.time()
         sample_H = self._bernoulliSample(probability_H_Positive,rng)
-
+        #print time.time() - current
+        current = time.time()
         v_reconstruct = self._mean_visibles_theano(sample_H,v_pos)
-        
+        #print time.time() - current
+        current = time.time()
         probability_H_Negtive = self._mean_hiddens_theano(v_reconstruct)
+        #print time.time() - current
+        current = time.time()
         gradience_Negtive = self._gradience_theano(v_reconstruct,probability_H_Negtive)
-        
+        #print time.time() -current
         self.components_ += lr * (gradience_Positive - gradience_Negtive)/self.n_components
-        
-        self.intercept_hidden_ += lr * ((probability_H_Positive.sum(axis = 0) - probability_H_Negtive.sum(axis = 0))).sum(axis = -1) / self.n_components
-        self.intercept_visible_ += lr * (v_pos.sum(axis = 0) - v_reconstruct.sum(axis = 0)).sum(axis = -1) / v_pos.shape[1]
+        #print "======================================" 
+        allProb =  probability_H_Positive.sum(axis = 0) - probability_H_Negtive.sum(axis = 0)
+        #print allProb.shape
+        #print allProb.sum(axis = -1)
+        #self.intercept_hidden_ += lr * ((probability_H_Positive.sum(axis = 0) - probability_H_Negtive.sum(axis = 0))).sum(axis = -1)/self.n_components * 5
+        #print self.intercept_hidden_
+        self.intercept_visible_ += lr * (v_pos.sum(axis = 0) - v_reconstruct.sum(axis = 0)).mean()
         return np.sum((v_pos - v_reconstruct) ** 2)
 
         
